@@ -2808,8 +2808,9 @@ function renderStores(){
 
           <a
             href="${getAdminURL(store.id)}"
-            target="_blank"
+            onclick="event.preventDefault(); openAdmin('${store.id}')"
             class="open-admin"
+            style="cursor:pointer"
           >
             إدارة المتجر
           </a>
@@ -4382,6 +4383,34 @@ function getBaseURL(){
 
 
 /* =========================================================
+   APP BASE URL (جذر التطبيق الفعلي)
+========================================================= */
+
+function getAppBase(){
+
+  const p =
+    window.location.pathname;
+
+  if(
+    p.indexOf(
+      "/nova-general-admin/"
+    ) === 0 &&
+    window.location.origin.indexOf(
+      "github.io"
+    ) !== -1
+  ){
+
+    return window.location.origin +
+      "/nova/";
+
+  }
+
+  return getBaseURL();
+
+}
+
+
+/* =========================================================
    ADMIN URL
 ========================================================= */
 
@@ -4389,11 +4418,114 @@ function getAdminURL(
   storeId
 ){
 
-  return getBaseURL() +
+  return getAppBase() +
     "admin.html?store=" +
     encodeURIComponent(
       storeId
     );
+
+}
+
+
+/* =========================================================
+   OPEN ADMIN (دخول ضمني كصاحب المتجر قبل الفتح)
+========================================================= */
+
+async function openAdmin(
+  storeId
+){
+
+  const url =
+    getAdminURL(
+      storeId
+    );
+
+  const win =
+    window.open(
+      "about:blank",
+      "_blank"
+    );
+
+  try{
+
+    const owner =
+      await db
+        .from("nova_users")
+        .select(
+          "phone,password_hash"
+        )
+        .eq(
+          "store_id",
+          storeId
+        )
+        .maybeSingle();
+
+    if(
+      owner.error ||
+      !owner.data ||
+      !owner.data.password_hash
+    ){
+      throw new Error(
+        "لا توجد بيانات دخول"
+      );
+    }
+
+    const r =
+      await db
+        .rpc(
+          "nova_login",
+          {
+            p_phone:
+              owner.data.phone,
+            p_password_hash:
+              owner.data.password_hash
+          }
+        );
+
+    if(
+      r.error ||
+      !r.data ||
+      !r.data.store_key
+    ){
+      throw new Error(
+        "تعذر الدخول"
+      );
+    }
+
+    const u =
+      r.data.user;
+
+    localStorage.setItem(
+      "nova_user",
+      JSON.stringify({
+        id: u.id,
+        name: u.name,
+        phone: u.phone,
+        store_id: storeId,
+        store_key: r.data.store_key
+      })
+    );
+
+  }catch(e){
+    /* نفتح الصفحة رغم ذلك */
+  }
+
+  if(win){
+
+    win.location.href =
+      url;
+
+  }else{
+
+    localStorage.setItem(
+      "nova_admin_redirect",
+      url
+    );
+
+    window.location.href =
+      url;
+
+  }
 
 }
 
@@ -4406,7 +4538,7 @@ function getStoreURL(
   storeId
 ){
 
-  return getBaseURL() +
+  return getAppBase() +
     "store.html?store=" +
     encodeURIComponent(
       storeId
