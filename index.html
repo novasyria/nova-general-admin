@@ -1588,9 +1588,6 @@ async function estimateDatabaseUsage(){
     let totalBytes =
       0;
 
-    let imageCount =
-      0;
-
     for(
       const table
       of Object.keys(ROW_SIZE_ESTIMATE)
@@ -1628,99 +1625,11 @@ async function estimateDatabaseUsage(){
     }
 
 
-    /* الصور = روابط Cloudinary في البيانات */
-
-    try{
-
-      const productsRes =
-        await db
-          .from("products")
-          .select("id,images");
-
-      if(!productsRes.error){
-
-        (productsRes.data || []).forEach(
-          p => {
-
-            imageCount +=
-              Array.isArray(p.images)
-                ? p.images.length
-                : 0;
-          }
-        );
-      }
-
-      const bannersRes =
-        await db
-          .from("banners")
-          .select("image");
-
-      if(!bannersRes.error){
-        imageCount +=
-          (bannersRes.data || [])
-            .filter(
-              b =>
-                b.image
-            ).length;
-      }
-
-      const categoriesRes =
-        await db
-          .from("categories")
-          .select("image");
-
-      if(!categoriesRes.error){
-        imageCount +=
-          (categoriesRes.data || [])
-            .filter(
-              c =>
-                c.image
-            ).length;
-      }
-
-      const settingsRes =
-        await db
-          .from("store_settings")
-          .select("logo");
-
-      if(!settingsRes.error){
-        imageCount +=
-          (settingsRes.data || [])
-            .filter(
-              s =>
-                s.logo
-            ).length;
-      }
-
-    }
-    catch(error){
-      console.warn(
-        "image count estimate:",
-        error.message
-      );
-    }
-
-
-    /* متوسط حجم كل صورة بعد الضغط ~150KB */
-
-    const imageBytes =
-      imageCount *
-      150 *
-      1024;
+    /* حجم الصور الفعلي يُقرأ من GitHub عبر loadImageStorage */
 
     setText(
       "dbUsage",
       formatBytes(totalBytes)
-    );
-
-    setText(
-      "totalImages",
-      imageCount.toLocaleString()
-    );
-
-    setText(
-      "imgUsage",
-      formatBytes(imageBytes)
     );
 
   }
