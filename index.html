@@ -223,6 +223,21 @@ select:focus{
   font-weight:900;
 }
 
+.imgProgress{
+  margin-top:10px;
+  height:8px;
+  background:#e2e8f0;
+  border-radius:6px;
+  overflow:hidden;
+}
+
+.imgProgressFill{
+  height:100%;
+  background:#4f46e5;
+  border-radius:6px;
+  transition:width .4s;
+}
+
 /* =====================================================
    SETTINGS
 ===================================================== */
@@ -915,13 +930,28 @@ select:focus{
 
       <div class="stat">
         <div class="stat-label">
-          حجم الصور التقريبي
+          حجم الصور (GitHub)
         </div>
         <div
           class="stat-number"
           id="imgUsage"
         >
           ...
+        </div>
+        <div class="imgProgress">
+          <div
+            class="imgProgressFill"
+            id="imgUsageFill"
+            style="width:0%"
+          >
+          </div>
+        </div>
+        <div
+          class="stat-label"
+          style="font-weight:700;margin-top:6px"
+        >
+          <span id="imgUsagePct">—</span>
+          <span style="color:#999;font-weight:400">/ 1GB</span>
         </div>
       </div>
 
@@ -1191,6 +1221,10 @@ const SUPABASE_KEY =
 
 const NOVA_MASTER_KEY =
 "8d03e68287d3b6c09184fc07a404e4f931b1cd40c5282e39e0ae5e9fddd566f9";
+
+const NOVA_MEDIA_FUNCTION =
+SUPABASE_URL +
+"/functions/v1/nova-media";
 
 const {
   createClient
@@ -1507,6 +1541,8 @@ async function loadDashboard(){
 
     loadExactDbSize();
 
+    loadImageStorage();
+
     initCleanupSettings();
 
   }
@@ -1784,6 +1820,132 @@ async function loadExactDbSize(){
       "تقدير تقريبي – أنشئ دالة nova_db_size لرؤية الحجم الفعلي";
 
     return false;
+
+  }
+
+}
+
+
+/* =========================================================
+   IMAGE STORAGE (github)
+   يقرأ المساحة الفعلية للصور من مستودع nova-images
+   عبر دالة nova-media (يغطي كل المتاجر تلقائياً).
+   ========================================================= */
+
+async function loadImageStorage(){
+
+  const usageEl =
+    document.getElementById(
+      "imgUsage"
+    );
+
+  const fillEl =
+    document.getElementById(
+      "imgUsageFill"
+    );
+
+  const pctEl =
+    document.getElementById(
+      "imgUsagePct"
+    );
+
+  const imagesEl =
+    document.getElementById(
+      "totalImages"
+    );
+
+  if(!usageEl)return;
+
+  try{
+
+    const res =
+      await fetch(
+        NOVA_MEDIA_FUNCTION,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+            apikey: SUPABASE_KEY,
+            Authorization:
+              "Bearer " + SUPABASE_KEY
+          },
+
+          body: JSON.stringify({
+            action: "stats"
+          })
+        }
+      );
+
+    if(!res.ok)throw new Error(
+      "stats failed: " + res.status
+    );
+
+    const stats =
+      await res.json();
+
+    const { totalBytes, count, limitBytes } =
+      stats;
+
+    usageEl.textContent =
+      formatBytes(totalBytes);
+
+    usageEl.title =
+      "الحجم الفعلي للصور على GitHub (كل المتاجر)";
+
+    if(pctEl){
+
+      const pct =
+        Math.min(
+          100,
+          Math.round(
+            (totalBytes / limitBytes) * 100
+          )
+        );
+
+      pctEl.textContent =
+        pct + "%";
+
+    }
+
+    if(fillEl){
+
+      const pct =
+        Math.min(
+          100,
+          Math.max(
+            0,
+            (totalBytes / limitBytes) * 100
+          )
+        );
+
+      fillEl.style.width =
+        pct + "%";
+
+      fillEl.style.background =
+        pct >= 85
+        ? "#dc2626"
+        : (
+          pct >= 60
+          ? "#f59e0b"
+          : "#4f46e5"
+        );
+
+    }
+
+    if(imagesEl){
+
+      imagesEl.textContent =
+        count.toLocaleString();
+
+    }
+
+  }
+  catch(error){
+
+    usageEl.title =
+      "تعذر الاتصال بنوفا-ميديا";
 
   }
 
