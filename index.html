@@ -3903,7 +3903,7 @@ async function toggleStore(
     updateStats();
 
 
-    if(selectedProjectId){
+    if(selectedProjectId || storeFilter){
 
       renderStores();
 
@@ -4029,38 +4029,87 @@ async function deleteStore(
     const EDGE_DELETE_URL =
       "https://xtsumqxirkziawlmttbg.supabase.co/functions/v1/dynamic-function";
 
+    const JS_DELIVR_PREFIX =
+      "https://cdn.jsdelivr.net/gh/novasyria/nova-images@main/";
+
     async function delImg(url){
 
       if(
         !url ||
-        !String(url).startsWith(
-          "https://res.cloudinary.com/"
+        (
+          !String(url).startsWith(
+            "https://res.cloudinary.com/"
+          ) &&
+          !String(url).startsWith(
+            JS_DELIVR_PREFIX
+          )
         )
       )
         return;
 
       try{
 
-        await fetch(
-          EDGE_DELETE_URL,
-          {
-            method:"POST",
-            headers:{
-              "Content-Type":"application/json",
-              apikey:SUPABASE_KEY,
-              Authorization:"Bearer " + SUPABASE_KEY
-            },
-            body:JSON.stringify({
-              url,
-              store_id:storeId
-            })
-          }
-        );
+        if(
+          String(url).startsWith(
+            JS_DELIVR_PREFIX
+          )
+        ){
+
+          await fetch(
+            NOVA_MEDIA_FUNCTION,
+            {
+              method:"POST",
+              headers:{
+                "Content-Type":"application/json",
+                apikey:SUPABASE_KEY,
+                Authorization:"Bearer " + SUPABASE_KEY
+              },
+              body:JSON.stringify({
+                action:"delete",
+                url
+              })
+            }
+          ).then(res => {
+
+            if(!res.ok)
+              console.warn(
+                "nova-media delete failed:",
+                res.status,
+                url
+              );
+
+          })["catch"](error => {
+            console.warn(
+              "تعذر حذف صورة من nova-media",
+              error
+            );
+          });
+
+        }
+        else{
+
+          await fetch(
+            EDGE_DELETE_URL,
+            {
+              method:"POST",
+              headers:{
+                "Content-Type":"application/json",
+                apikey:SUPABASE_KEY,
+                Authorization:"Bearer " + SUPABASE_KEY
+              },
+              body:JSON.stringify({
+                url,
+                store_id:storeId
+              })
+            }
+          );
+
+        }
 
       }catch(error){
 
         console.warn(
-          "تعذر حذف صورة من Cloudinary",
+          "تعذر حذف صورة من التخزين",
           error
         );
       }
@@ -4269,11 +4318,11 @@ async function deleteStore(
 
 
     updateStats();
+if(selectedProjectId || storeFilter){
 
-    if(selectedProjectId){
       renderStores();
-    }
 
+    }
 
     alert(
       "تم حذف المتجر وكل بياناته نهائياً ✅" +
